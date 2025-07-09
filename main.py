@@ -4,27 +4,32 @@ import yaml
 import re
 
 
+# helper class for marking strings as literal scalars
 class LiteralStr(str):
     pass
 
 
+# helper class to mark arrays/lists as flow style type
 class FlowList(list):
     pass
 
 
+# presenter method to force PyYaml to save data as literal scalars
 def literal_presenter(dumper, data):
     return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
 
 
+# presenter method to force PyYaml to save data as flow style data
 def flow_list_presenter(dumper, data):
     return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=True)
 
 
+# registering presenter methods with their respective helper classes
 yaml.add_representer(LiteralStr, literal_presenter)
 yaml.add_representer(FlowList, flow_list_presenter)
 
 
-# Creates a dictionary containing information about a field stored in a template
+# Creates a dictionary containing information about a field stored in a template file
 def create_field_dict(node):
     tmp = {
         "Name": str(node.attrib["name"]),
@@ -32,16 +37,20 @@ def create_field_dict(node):
         "Subtype": str(node.attrib['subtype']),
         "Caption": str(node.attrib['caption']),
     }
-    if tmp["Name"] == "hrsFrom" or tmp["Name"] == "from":
+
+    # Adding default values to certain fields
+    if tmp.get("Name") == "hrsFrom" or tmp.get("Name") == "from":
         tmp["DefaultVal"] = 6
-    if tmp["Name"] == "hrsTo" or tmp["Name"] == "to":
+    if tmp.get("Name") == "hrsTo" or tmp.get("Name") == "to":
         tmp["DefaultVal"] = 16
 
-    if tmp["Name"] == "hrsFrom" or tmp["Name"] == "hrsTo":
+    # Changing subtype to match new format
+    if tmp.get("Name") == "hrsFrom" or tmp.get("Name") == "hrsTo":
         tmp["Subtype"] = "time"
-    elif tmp["Name"] == "from" or tmp["Name"] == "to":
+    elif tmp.get("Name") == "from" or tmp.get("Name") == "to":
         tmp["Subtype"] = "datetime"
 
+    # Extracting Lookup query if one exists for this field
     if node.text is not None and len(node.text) > 0:
         tmp["LookupQuery"] = str(node.text).strip()
 
@@ -52,8 +61,9 @@ def create_field_dict(node):
 def create_header_dict(node):
     colspan = int(node.attrib['colspan']) if 'colspan' in node.attrib else None
 
+    text = node.text
     tmp = {
-        "Text": ' ' if node.text is None or node.text == '' else node.text,
+        "Text": ' ' if text is None or text == '' else text.strip().replace("\x9C", "ś"),
     }
 
     if colspan is not None:
@@ -98,11 +108,6 @@ def create_form_dict(node):
     return tmp
 
 
-def add_suffix(match):
-    param = match.group(1)
-    return f"@{param}_sql"
-
-
 # Creates dictionary containing all data needed for a report template
 def create_report_dict(node, filename):
     disp = node.find('display_result')
@@ -117,13 +122,16 @@ def create_report_dict(node, filename):
 
     query_tmp = node.find('sql').find("sql_question").text.strip()
     query_tmp = query_tmp.replace('\xa0', " ")
-    query_tmp = query_tmp.replace('\r', " ")
+    query_tmp = query_tmp.replace('\r', "")
+    query_tmp = query_tmp.replace('\t', "")
+    query_tmp = query_tmp.replace('\x9C', "ś")
+
     query_tmp = re.sub(r'[ \t]*\n[ \t]*', '\n', query_tmp)
     query_tmp = re.sub(r'[ \t]{2,}', ' ', query_tmp)
-    query_tmp = re.sub(r'@(\w+)', add_suffix, query_tmp)
+    query_tmp = re.sub(r'@(\w+)', r' @\1_sql', query_tmp)
     query_tmp = re.sub(r'\?(\w+)\?', r'@\1', query_tmp)
-    query_tmp = re.sub(r'--.*?\n', '', query_tmp)
-
+    query_tmp = re.sub(r' \n', "\n", query_tmp)
+    query_tmp = re.sub(r'\n ', "\n", query_tmp)
     sql_text_final = query_tmp.strip()
     if '\n' in sql_text_final and not sql_text_final.endswith('\n'):
         sql_text_final += '\n'
