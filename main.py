@@ -53,6 +53,8 @@ def create_field_dict(node):
     # Extracting Lookup query if one exists for this field
     if node.text is not None and len(node.text) > 0:
         tmp["LookupQuery"] = str(node.text).strip()
+        if tmp.get('Subtype') == "multiList":
+            tmp["Subtype"] = "multilist"
 
     return tmp
 
@@ -129,6 +131,7 @@ def create_report_dict(node, filename):
     query_tmp = re.sub(r'[ \t]*\n[ \t]*', '\n', query_tmp)
     query_tmp = re.sub(r'[ \t]{2,}', ' ', query_tmp)
     query_tmp = re.sub(r'@(\w+)', r' @\1_sql', query_tmp)
+    query_tmp = re.sub(r'\(\s*\?(\w+)\?\s*\)', r'@\1', query_tmp)
     query_tmp = re.sub(r'\?(\w+)\?', r'@\1', query_tmp)
     query_tmp = re.sub(r' \n', "\n", query_tmp)
     query_tmp = re.sub(r'\n ', "\n", query_tmp)
