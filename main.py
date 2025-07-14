@@ -124,6 +124,7 @@ def newline_reducer(match):
 def create_report_dict(node, filename):
     disp = node.find('display_result')
 
+    # Gathering all report header fields from a src template
     headers = []
     for row in disp.find('header').findall('tr'):
         tmp = []
@@ -132,12 +133,14 @@ def create_report_dict(node, filename):
 
         headers.append(tmp)
 
+    # Gathering and cleaning sql query from drc template
     query_tmp = node.find('sql').find("sql_question").text.strip()
     query_tmp = query_tmp.replace('\xa0', " ")
     query_tmp = query_tmp.replace('\r', "")
     query_tmp = query_tmp.replace('\t', "")
     query_tmp = query_tmp.replace('\x9C', "ś")
 
+    # Regexes responsible for adapting query for .Net Dapper and cleaning unnecessary whitespaces
     query_tmp = re.sub(r'@(\w+)', r'@\1_sql', query_tmp)
     query_tmp = re.sub(r'(\(\s*)?\?(\w+)\?(\s*\))?', r'@\2', query_tmp)
     query_tmp = re.sub(r'(\s*)(\n+)(\s*)', newline_reducer, query_tmp)
@@ -146,7 +149,7 @@ def create_report_dict(node, filename):
     if '\n' in sql_text_final and not sql_text_final.endswith('\n'):
         sql_text_final += '\n'
 
-    # Crucial step: Wrap the string with LiteralStr
+    # Wrapping query with LiteralStr so in output file its saved as literal scalar
     query = LiteralStr(sql_text_final)
 
     tmp = {
