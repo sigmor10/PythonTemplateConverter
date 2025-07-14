@@ -110,6 +110,16 @@ def create_form_dict(node):
     return tmp
 
 
+def newline_reducer(match):
+    m_string = match.group(0)
+    count = m_string.count('\n')
+
+    if count > 2:
+        return "\n\n"
+    else:
+        return "\n" * count
+
+
 # Creates dictionary containing all data needed for a report template
 def create_report_dict(node, filename):
     disp = node.find('display_result')
@@ -128,13 +138,10 @@ def create_report_dict(node, filename):
     query_tmp = query_tmp.replace('\t', "")
     query_tmp = query_tmp.replace('\x9C', "ś")
 
-    query_tmp = re.sub(r'[ \t]*\n[ \t]*', '\n', query_tmp)
-    query_tmp = re.sub(r'[ \t]{2,}', ' ', query_tmp)
-    query_tmp = re.sub(r'@(\w+)', r' @\1_sql', query_tmp)
-    query_tmp = re.sub(r'\(\s*\?(\w+)\?\s*\)', r'@\1', query_tmp)
-    query_tmp = re.sub(r'\?(\w+)\?', r'@\1', query_tmp)
-    query_tmp = re.sub(r' \n', "\n", query_tmp)
-    query_tmp = re.sub(r'\n ', "\n", query_tmp)
+    query_tmp = re.sub(r'@(\w+)', r'@\1_sql', query_tmp)
+    query_tmp = re.sub(r'(\(\s*)?\?(\w+)\?(\s*\))?', r'@\2', query_tmp)
+    query_tmp = re.sub(r'(\s*)(\n+)(\s*)', newline_reducer, query_tmp)
+
     sql_text_final = query_tmp.strip()
     if '\n' in sql_text_final and not sql_text_final.endswith('\n'):
         sql_text_final += '\n'
@@ -190,7 +197,7 @@ def get_all_xml(folder):
 
 
 if __name__ == '__main__':
-    source_path = "./XMLTemplates"
+    source_path = "./input"
     output_path = "./out"
     templates = get_all_xml(source_path)
     Path("out").mkdir(parents=True, exist_ok=True)
